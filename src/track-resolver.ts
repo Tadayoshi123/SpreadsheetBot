@@ -9,6 +9,29 @@ export type ResolveTrackOptions = {
 };
 
 /**
+ * Map slash `track` input to a track id (config key).
+ * Accepts id (`shirakawa`) or display label (`Shirakawa Circuit`) — users often type the label.
+ */
+export function resolveTrackOptionToId(
+  cfg: AppConfig,
+  guildTrackIds: readonly string[],
+  trackOption: string
+): string | null {
+  const raw = trackOption.trim();
+  if (!raw) return null;
+
+  if (guildTrackIds.includes(raw)) return raw;
+
+  const lower = raw.toLowerCase();
+  for (const id of guildTrackIds) {
+    if (id.toLowerCase() === lower) return id;
+    const label = cfg.tracks.get(id)?.label.trim();
+    if (label && label.toLowerCase() === lower) return id;
+  }
+  return null;
+}
+
+/**
  * Resolve which tier list track an interaction targets.
  * Add/edit: filtered by member roles (tracks.json allowedRoleIds).
  * Lookup: all tracks configured on the guild.
@@ -42,18 +65,18 @@ export function resolveTrackContext(
 
   if (allowedIds.length === 1) {
     trackId = allowedIds[0]!;
-    if (
-      trackOption != null &&
-      trackOption.trim() &&
-      trackOption.trim() !== trackId
-    ) {
-      const hint = options?.lookup
-        ? "This server only has one spreadsheet; do not set **track**."
-        : "You only have access to one spreadsheet; leave **track** empty or pick the one you are allowed to use.";
-      throw new Error(hint);
+    if (trackOption != null && trackOption.trim()) {
+      const resolved = resolveTrackOptionToId(cfg, guildTrackIds, trackOption);
+      if (resolved && resolved !== trackId) {
+        const hint = options?.lookup
+          ? "This server only has one spreadsheet; do not set **track**."
+          : "You only have access to one spreadsheet; leave **track** empty or pick the one you are allowed to use.";
+        throw new Error(hint);
+      }
     }
   } else if (trackOption != null && trackOption.trim()) {
-    trackId = trackOption.trim();
+    const resolved = resolveTrackOptionToId(cfg, guildTrackIds, trackOption);
+    trackId = resolved ?? trackOption.trim();
   } else if (options?.lookup && binding?.defaultTrack) {
     trackId = binding.defaultTrack;
   } else {
@@ -64,17 +87,19 @@ export function resolveTrackContext(
     );
   }
 
+  const track = cfg.tracks.get(trackId);
+  if (!track) {
+    throw new Error(
+      `Unknown track **${trackOption?.trim() || trackId}**. Pick **track** from the autocomplete list (do not type the full name).`
+    );
+  }
+
   if (!allowedIds.includes(trackId)) {
     throw new Error(
       options?.lookup
         ? "That spreadsheet is not available on this server."
         : "You do not have permission to use that spreadsheet."
     );
-  }
-
-  const track = cfg.tracks.get(trackId);
-  if (!track) {
-    throw new Error(`Unknown track **${trackId}**.`);
   }
 
   return { trackId, track };
@@ -112,6 +137,12 @@ export function enginesForAutocomplete(
   commandName: string
 ): readonly string[] {
   if (trackOption?.trim()) {
+    const guildTrackIds = trackIdsForGuild(cfg, guildId);
+    const trackId = resolveTrackOptionToId(cfg, guildTrackIds, trackOption);
+    if (trackId) {
+      const engines = cfg.tracks.get(trackId)?.sheetConfig.enums.engine;
+      if (engines) return engines;
+    }
     try {
       const { track } = resolveTrackForAutocomplete(
         cfg,
