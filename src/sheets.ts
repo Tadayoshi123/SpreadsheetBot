@@ -2,7 +2,11 @@ import { google } from "googleapis";
 import type { sheets_v4 } from "googleapis";
 import type { JWT } from "google-auth-library";
 import type { SheetConfig } from "./types.js";
-import { parseLapTime, formatTimeForSheet } from "./time.js";
+import {
+  parseLapTime,
+  formatTimeForSheet,
+  formatLapTimeSeconds,
+} from "./time.js";
 import {
   type TierBlock,
   type CarRowRef,
@@ -911,7 +915,7 @@ export class SheetsEntryService {
       if (existing.timeNum <= newTimeNum) {
         return (
           `This car is already listed with a faster or equal time ` +
-          `(${existing.timeNum}). No changes made.`
+          `(${formatLapTimeSeconds(existing.timeNum)}). No changes made.`
         );
       }
       const dupPhysical1Based = dataStartRow + existing.offset;

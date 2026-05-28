@@ -47,7 +47,7 @@ export function createEditEntryCommand(ctx: SlashSheetCommandContext) {
     .addStringOption((o) =>
       o
         .setName("time")
-        .setDescription("Lap time. E.g. 43.6 or 43,6 (omit = keep old value)")
+        .setDescription("Lap time M:SS.mmm (e.g. 0:43.600). Omit = keep old value")
         .setRequired(false)
     )
     .addStringOption((o) =>

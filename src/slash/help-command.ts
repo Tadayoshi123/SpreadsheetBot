@@ -5,7 +5,7 @@ export const HELP_EMBED_DESCRIPTION_MAX = 4096;
 
 /** Embed body for `/help` (available to all server members). */
 export const SHEET_MANAGER_HELP_BODY = `
-**SpreadsheetBot** updates shared Google Sheets (**columns B–O** per class tab). Lap times: **smaller = faster**. Share codes are stored in **cell notes** on **Tuner (D)** and **Alternative tune(s) (O)**.
+**SpreadsheetBot** updates shared Google Sheets (**columns B–O** per class tab). Lap times use **M:SS.mmm** (e.g. \`0:43.600\`, \`1:02.245\`); **smaller = faster**. Share codes are stored in **cell notes** on **Tuner (D)** and **Alternative tune(s) (O)**.
 
 **Who can use what**
 • **/help** and **/lookup-car** — any server member (only you see the reply).

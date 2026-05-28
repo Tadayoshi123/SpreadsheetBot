@@ -50,7 +50,7 @@ Moderators add Forza Horizon–style tier-list rows via Discord slash commands (
 
 ### Time format
 
-`time` is parsed as a single number: comma or dot decimal separator is accepted (`43,6` and `43.6` are equivalent). **Smaller = faster.** The same string you type (trimmed) is written to column **C** when possible.
+Lap times use **`M:SS.mmm`** (e.g. `0:43.600`, `1:02.245`). Comma or dot is accepted for the fractional part (`0:43,600`). **Smaller = faster.** Values are normalized to this format in column **C**. Legacy rows without a colon (e.g. `43.6`) are still read as **seconds only**. Tier labels in column A should use the same syntax in thresholds (e.g. `T1 (<0:45.000)`).
 
 ### Share codes
 

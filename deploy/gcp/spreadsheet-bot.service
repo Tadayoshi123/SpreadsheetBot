@@ -8,7 +8,8 @@ Wants=network-online.target
 Type=simple
 User=REPLACE_USER
 WorkingDirectory=REPLACE_HOME/SpreadsheetBot
-EnvironmentFile=REPLACE_HOME/SpreadsheetBot/.env
+# .env is loaded by dotenv in src/config.ts — do not use EnvironmentFile= here:
+# systemd cannot parse JSON values (GOOGLE_SERVICE_ACCOUNT_JSON) and breaks the private key.
 ExecStart=/usr/bin/node REPLACE_HOME/SpreadsheetBot/dist/index.js
 Restart=on-failure
 RestartSec=10

@@ -40,23 +40,7 @@ cp .env.example .env
 nano .env
 ```
 
-Colle tes secrets Discord, puis configure Google (voir ci-dessous).
-
-**Google sur la VM (recommandé)** :
-
-```bash
-nano ~/sa.json
-# colle le JSON du compte de service (téléchargé depuis GCP)
-chmod 600 ~/sa.json
-```
-
-Dans `.env` :
-
-```env
-GOOGLE_APPLICATION_CREDENTIALS=/home/TON_USER/sa.json
-```
-
-(ne mets pas le JSON sur une ligne dans `.env` — erreur `DECODER routines::unsupported` fréquente)
+Colle tes secrets, puis :
 
 ```bash
 chmod 600 .env

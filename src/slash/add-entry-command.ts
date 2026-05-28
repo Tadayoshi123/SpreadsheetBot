@@ -69,7 +69,10 @@ export function createAddEntryCommand(ctx: SlashSheetCommandContext) {
         .setRequired(true)
     )
     .addStringOption((o) =>
-      o.setName("time").setDescription("Lap time (e.g. 43.6 or 43,6)").setRequired(true)
+      o
+        .setName("time")
+        .setDescription("Lap time M:SS.mmm (e.g. 0:43.600 or 1:02.245)")
+        .setRequired(true)
     )
     .addStringOption((o) =>
       o.setName("tuner").setDescription("Tuner name (e.g. TheDannny)").setRequired(true)
