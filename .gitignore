@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.*
+credentials/
+*.pem
+*-credentials*.json
+
+# Déploiement / IDE / artefacts locaux
+*.tgz
+*.zip
+terminals/
+agent-transcripts/
+assets/
+uploads/

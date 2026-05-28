@@ -1,0 +1,22 @@
+{
+  "tracks": {
+    "default": {
+        "label": "Sunflower Scramble",
+        "spreadsheetId": "1Zdw6MEMzjg5xBeRdpqZBFEWE5UWl3sUuytal7vXbghM",
+        "sheetConfigPath": "./config/sheets.json",
+        "allowedRoleIds": ["1500543166732959875", "1500606175878713465", "1509242779954446466"]
+      },
+      "shirakawa": {
+        "label": "Shirakawa Circuit",
+        "spreadsheetId": "1FWEAVyW5sTdKAZgwsVbkzXwYsc5t9BQMg3SrEK0mbFI",
+        "sheetConfigPath": "./config/sheets.json",
+        "allowedRoleIds": ["1500543166732959875", "1500606175878713465", "1509245671415222522"]
+      },
+      "legends-island-cc": {
+        "label": "Legends Island Cross Country Circuit",
+        "spreadsheetId": "1QRrUnPw0RrCul_891QKpywUm6-IdgcKoNg12S_-tA_w",
+        "sheetConfigPath": "./config/sheets.json",
+        "allowedRoleIds": ["1500543166732959875", "1500606175878713465", "1509245317277552680"]
+      }
+    }
+  }

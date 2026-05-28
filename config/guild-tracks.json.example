@@ -1,0 +1,8 @@
+{
+  "guilds": {
+    "YOUR_DISCORD_GUILD_ID": {
+      "tracks": ["default"],
+      "defaultTrack": "default"
+    }
+  }
+}

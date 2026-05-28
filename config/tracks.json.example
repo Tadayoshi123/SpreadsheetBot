@@ -1,0 +1,10 @@
+{
+  "tracks": {
+    "default": {
+      "label": "Main tier list",
+      "spreadsheetId": "PASTE_SPREADSHEET_ID_HERE",
+      "sheetConfigPath": "./config/sheets.json",
+      "allowedRoleIds": ["PASTE_DISCORD_ROLE_ID_AS_STRING"]
+    }
+  }
+}

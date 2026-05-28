@@ -1,0 +1,17 @@
+# Modèle — installé par deploy/gcp/setup-vm.sh (User + chemins = utilisateur courant).
+[Unit]
+Description=SpreadsheetBot Discord bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=REPLACE_USER
+WorkingDirectory=REPLACE_HOME/spreadsheet-bot
+EnvironmentFile=REPLACE_HOME/spreadsheet-bot/.env
+ExecStart=/usr/bin/node REPLACE_HOME/spreadsheet-bot/dist/index.js
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

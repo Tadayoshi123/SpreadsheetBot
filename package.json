@@ -1,0 +1,26 @@
+{
+  "name": "spreadsheet-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for Forza Horizon tier-list Google Sheets",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "node --watch dist/index.js",
+    "register": "node dist/register-commands.js",
+    "sync-engine-dropdowns": "node dist/sync-engine-dropdowns.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}
