@@ -17,7 +17,7 @@ import { trackIdsForGuild } from "./config.js";
 import {
   readTrackOption,
   resolveTrackContext,
-  resolveTrackForAutocomplete,
+  enginesForAutocomplete,
 } from "./track-resolver.js";
 import {
   HELP_EMBED_DESCRIPTION_MAX,
@@ -110,17 +110,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const trackOption = readTrackOption((name) =>
         interaction.options.getString(name)
       );
-      const { track } = resolveTrackForAutocomplete(
+      const engines = enginesForAutocomplete(
         cfg,
         interaction.guildId,
         trackOption,
         interaction.member,
         cmd
       );
-      const choices = engineAutocompleteChoices(
-        track.sheetConfig.enums.engine,
-        focused.value
-      );
+      const choices = engineAutocompleteChoices(engines, focused.value);
       await interaction.respond(choices);
     } catch {
       await interaction.respond([]);

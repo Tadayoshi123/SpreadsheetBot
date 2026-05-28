@@ -16,7 +16,7 @@ Primary tuner: **9 digits** (spaces OK, e.g. \`123 456 789\`).
 Alternate tunes (\`alternate_tunes\`): **Name|9-digit code**, comma-separated — e.g. \`Fenrir3268|123456789\`. Avoid commas in the name. On **/edit-entry**, \`-\` alone in \`alternate_tunes\` clears column **O**.
 
 **Several spreadsheets**
-If your server has more than one, pick **\`track\`** (type to search). For add/edit you only see the ones your roles allow; if you only have one, leave **\`track\`** empty.
+If your server has more than one, pick **\`track\`** right after **\`class\`** (required on add/edit). For add/edit you only see lists your roles allow.
 
 **Commands**
 **\/add-entry** — Adds a row; **class** picks the sheet tab. Duplicate **car** names are only updated when the new lap time is **strictly faster**. **Engine** uses autocomplete.

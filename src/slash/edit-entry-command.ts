@@ -33,15 +33,16 @@ export function createEditEntryCommand(ctx: SlashSheetCommandContext) {
         .setDescription("Class tab (e.g. S2)")
         .setRequired(true)
         .addChoices(first, ...classOpts)
-    )
-    .addStringOption((o) =>
+    );
+
+  b = addTrackOptionWhenNeeded(b, ctx, "early");
+
+  b = b.addStringOption((o) =>
       o
         .setName("car")
         .setDescription("Car name as in column B (e.g. Honda Beat 1991). Case-insensitive, normalized spaces.")
         .setRequired(true)
     );
-
-  b = addTrackOptionWhenNeeded(b, ctx);
 
   return b
     .addStringOption((o) =>

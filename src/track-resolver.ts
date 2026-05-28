@@ -99,3 +99,53 @@ export function resolveTrackForAutocomplete(
     lookup: commandName === "lookup-car",
   });
 }
+
+/**
+ * Engine list for autocomplete. Works without `track` when the member has one
+ * allowed list, or unions engines across their allowed lists as a fallback.
+ */
+export function enginesForAutocomplete(
+  cfg: AppConfig,
+  guildId: string,
+  trackOption: string | null,
+  member: GuildMember | APIInteractionGuildMember | null,
+  commandName: string
+): readonly string[] {
+  if (trackOption?.trim()) {
+    try {
+      const { track } = resolveTrackForAutocomplete(
+        cfg,
+        guildId,
+        trackOption,
+        member,
+        commandName
+      );
+      return track.sheetConfig.enums.engine;
+    } catch {
+      return [];
+    }
+  }
+
+  const allowedIds =
+    commandName === "lookup-car"
+      ? trackIdsForGuild(cfg, guildId)
+      : memberAllowedTrackIds(cfg, guildId, member);
+
+  if (allowedIds.length === 1) {
+    return cfg.tracks.get(allowedIds[0]!)?.sheetConfig.enums.engine ?? [];
+  }
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of allowedIds) {
+    const engines = cfg.tracks.get(id)?.sheetConfig.enums.engine;
+    if (!engines) continue;
+    for (const e of engines) {
+      if (!seen.has(e)) {
+        seen.add(e);
+        out.push(e);
+      }
+    }
+  }
+  return out;
+}

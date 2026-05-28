@@ -9,21 +9,26 @@ type SheetSlashBuilder =
   | SlashCommandOptionsOnlyBuilder;
 
 /**
- * Appends optional `track` (autocomplete) when the guild has multiple tier lists.
- * Must run after all required options — Discord rejects optional-before-required ordering.
+ * `track` when the guild has multiple tier lists.
+ * - `early` (add/edit): required, right after `class` so users pick it before `engine`.
+ * - `late` (lookup): optional at the end of the command.
  */
 export function addTrackOptionWhenNeeded(
   builder: SheetSlashBuilder,
-  ctx: SlashSheetCommandContext
+  ctx: SlashSheetCommandContext,
+  placement: "early" | "late" = "late"
 ): SheetSlashBuilder {
   if (!ctx.showTrackOption) return builder;
+  const required = placement === "early";
   return builder.addStringOption((o) =>
     o
       .setName("track")
       .setDescription(
-        "Spreadsheet — type to search (omit if you only have access to one)"
+        required
+          ? "Tier list / spreadsheet — pick first (engines depend on it)"
+          : "Spreadsheet — type to search (or leave empty for default)"
       )
-      .setRequired(false)
+      .setRequired(required)
       .setAutocomplete(true)
   );
 }
@@ -61,7 +66,11 @@ export function createAddEntryCommand(ctx: SlashSheetCommandContext) {
         .setDescription("Sheet tab (e.g. S2)")
         .setRequired(true)
         .addChoices(first, ...classOpts)
-    )
+    );
+
+  opt = addTrackOptionWhenNeeded(opt, ctx, "early");
+
+  opt = opt
     .addStringOption((o) =>
       o
         .setName("car")
@@ -133,11 +142,7 @@ export function createAddEntryCommand(ctx: SlashSheetCommandContext) {
         .setName("video")
         .setDescription("Video URL (e.g. YouTube or Streamable)")
         .setRequired(true)
-    );
-
-  opt = addTrackOptionWhenNeeded(opt, ctx);
-
-  opt = opt
+    )
     .addStringOption((o) =>
       o
         .setName("driving_characteristics")
