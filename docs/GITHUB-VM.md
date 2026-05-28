@@ -3,12 +3,12 @@
 ## 1. Créer le dépôt sur GitHub (toi, une fois)
 
 1. [github.com/new](https://github.com/new)
-2. **Repository name** : `spreadsheet-bot` (ou autre)
+2. **Repository name** : `SpreadsheetBot`
 3. **Private** (recommandé : IDs Discord, spreadsheets dans `config/`)
 4. **Ne coche pas** « Add README » (le projet en a déjà un)
 5. **Create repository**
 
-Note l’URL, ex. `https://github.com/TON_USER/spreadsheet-bot.git`
+Repo : `https://github.com/Tadayoshi123/SpreadsheetBot`
 
 ## 2. Pousser le code depuis ton PC
 
@@ -24,7 +24,7 @@ git status
 git commit -m "Initial commit: SpreadsheetBot Discord + GCP deploy"
 
 git branch -M main
-git remote add origin https://github.com/TON_USER/spreadsheet-bot.git
+git remote add origin https://github.com/Tadayoshi123/SpreadsheetBot.git
 git push -u origin main
 ```
 
@@ -32,12 +32,10 @@ GitHub te demandera de te connecter (navigateur ou token).
 
 ## 3. Cloner sur la VM (terminal navigateur GCP)
 
-Remplace `TON_USER` et le nom du repo :
-
 ```bash
 cd ~
-git clone https://github.com/TON_USER/spreadsheet-bot.git
-cd spreadsheet-bot
+git clone https://github.com/Tadayoshi123/SpreadsheetBot.git
+cd SpreadsheetBot
 cp .env.example .env
 nano .env
 ```
@@ -64,7 +62,7 @@ git push
 **VM :**
 
 ```bash
-cd ~/spreadsheet-bot
+cd ~/SpreadsheetBot
 git pull
 npm ci
 npm run build

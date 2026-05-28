@@ -2,7 +2,7 @@
 # Run on the GCP VM after clone in ~/spreadsheet-bot (any Linux user).
 set -euo pipefail
 
-APP_DIR="${HOME}/spreadsheet-bot"
+APP_DIR="${HOME}/SpreadsheetBot"
 USER_NAME="$(whoami)"
 cd "$APP_DIR"
 

@@ -7,9 +7,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=REPLACE_USER
-WorkingDirectory=REPLACE_HOME/spreadsheet-bot
-EnvironmentFile=REPLACE_HOME/spreadsheet-bot/.env
-ExecStart=/usr/bin/node REPLACE_HOME/spreadsheet-bot/dist/index.js
+WorkingDirectory=REPLACE_HOME/SpreadsheetBot
+EnvironmentFile=REPLACE_HOME/SpreadsheetBot/.env
+ExecStart=/usr/bin/node REPLACE_HOME/SpreadsheetBot/dist/index.js
 Restart=on-failure
 RestartSec=10
 
