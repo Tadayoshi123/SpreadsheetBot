@@ -57,8 +57,8 @@ Sur la VM :
 ```bash
 sudo apt-get update
 sudo apt-get install -y git
-git clone https://github.com/TON_USER/TON_REPO.git spreadsheet-bot
-cd spreadsheet-bot
+git clone https://github.com/Tadayoshi123/SpreadsheetBot.git
+cd SpreadsheetBot
 ```
 
 ### Option B — Copie depuis ton PC (sans Git public)
@@ -93,10 +93,26 @@ Renseigne au minimum :
 - `DISCORD_CLIENT_ID`
 - `DISCORD_TOKEN`
 - `DISCORD_ALLOWED_ROLE_IDS`
-- `GOOGLE_SERVICE_ACCOUNT_JSON` (JSON **sur une ligne**, comme en local)
 - `DISCORD_GUILD_ID` si tu utilises des enregistrements par serveur
+- **Google** : préfère un fichier (voir ci-dessous), pas le JSON inline dans `.env`
 
 Vérifie que `config/tracks.json`, `config/guild-tracks.json` et les configs sheet sont présents (copiés avec le projet).
+
+**Compte de service Google (recommandé sur la VM)** :
+
+```bash
+nano ~/sa.json
+# colle le JSON complet téléchargé depuis GCP (Ctrl+Shift+V)
+chmod 600 ~/sa.json
+```
+
+Dans `.env` :
+
+```env
+GOOGLE_APPLICATION_CREDENTIALS=/home/ydjoudi1/sa.json
+```
+
+(commente ou supprime `GOOGLE_SERVICE_ACCOUNT_JSON`)
 
 **Permissions :**
 
@@ -154,6 +170,7 @@ sudo systemctl restart spreadsheet-bot
 | `Permission denied (publickey)` | Clé SSH mal ajoutée dans GCP ou mauvais utilisateur (`ubuntu`) |
 | Bot ne démarre pas | `sudo journalctl -u spreadsheet-bot -n 80` |
 | Erreur Google | Partage des spreadsheets avec l’email du compte de service |
+| `DECODER routines::unsupported` sur `/add-entry` | Clé privée cassée dans `.env` → utiliser `GOOGLE_APPLICATION_CREDENTIALS` + `~/sa.json` (voir §4) |
 | Facturation GCP | Vérifie *Facturation → Rapports* : seule l’e2-micro US + disque standard |
 
 ---
