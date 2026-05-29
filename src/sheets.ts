@@ -40,7 +40,10 @@ import {
   parseOneOfRangeReference,
   validationListRangeA1,
 } from "./difficultyFormat.js";
-import { formatVideoForSheet } from "./video-hyperlink.js";
+import {
+  formatVideoForSheet,
+  preserveVideoForSheet,
+} from "./video-hyperlink.js";
 
 export type NewEntryPayload = {
   /** R, S2, S1, A, B */
@@ -754,7 +757,7 @@ export class SheetsEntryService {
     if (p.engine !== undefined) merged[7] = p.engine.trim();
     if (p.build_type !== undefined) merged[8] = p.build_type.trim();
     if (p.performance !== undefined) merged[9] = p.performance.trim();
-    if (p.video !== undefined) merged[10] = formatVideoForSheet(p.video);
+    merged[10] = preserveVideoForSheet(rowCells?.[10], merged[10] ?? "", p.video);
     if (p.driving_characteristics !== undefined) {
       merged[11] =
         p.driving_characteristics.trim() === ""
