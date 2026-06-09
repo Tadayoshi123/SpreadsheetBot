@@ -59,7 +59,7 @@ An optional, **auto-regenerated** spreadsheet that lists every configured track 
    - env var `PORTAL_SPREADSHEET_ID` (overrides `tracks.json`; `PORTAL_TAB_TITLE` overrides the tab name).
 4. Fill the per-track metadata in `config/tracks.json` (`surface`, `trackType`, `recommended` — all optional; missing values show `-`).
 
-The `Tracks` tab is rebuilt on **startup** and after every successful **add/update**. Columns: `Tracé | Lien | Surface | Type | Voiture/Perf recommandée | Dernière MAJ | Dernière soumission (classe, voiture, temps, conducteur, date)`. The "last submission" data comes from each track's `_SubmissionLog` (below). If the portal is not configured, the feature is silently disabled (no regression). Portal write failures are logged but never affect command replies.
+The `Tracks` tab is rebuilt on **startup** and after every successful **add/update**. Columns: `Track | Link | Surface | Type | Recommended car/perf | Last updated | Last submission (class, car, time, driver, date)`. Track links use API hyperlinks (not `HYPERLINK` formulas) so they work on French-locale spreadsheets too. The "last submission" data comes from each track's `_SubmissionLog` (below). If the portal is not configured, the feature is silently disabled (no regression). Portal write failures are logged but never affect command replies.
 
 ### Submission journal (`_SubmissionLog`)
 
