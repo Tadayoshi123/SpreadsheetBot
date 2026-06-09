@@ -5,43 +5,82 @@ import type { AppConfig } from "./types.js";
 import type { SheetsServiceRegistry } from "./service-registry.js";
 import type { LastSubmission } from "./sheets.js";
 
-const PORTAL_HEADERS = [
+const COL_COUNT = 7;
+const DASH = "-";
+
+const TABLE_HEADERS = [
   "Track",
   "Link",
   "Surface",
   "Type",
-  "Recommended Build",
+  "Meta focus",
   "Last updated",
   "Last submission (class, car, time, driver, date)",
 ] as const;
 
-const COLUMN_COUNT = PORTAL_HEADERS.length;
+const TITLE = "FH6 Community Tune Lab by Fenrir";
+const TAGLINE =
+  "Community-driven Forza Horizon 6 tier lists — cars, tunes and lap times, track by track.";
 
-const PORTAL_TITLE = "FH6 Community Tune Lab";
-const PORTAL_SUBTITLE =
-  "Community-driven car tuning & lap-time tier lists for Forza Horizon 6";
-const PORTAL_CREDITS =
-  "Concept originally created by SulexPagMan — Spreadsheets maintained by Fenrir & SpreadsheetBot";
+const WELCOME =
+  "FH6 Community Tune Lab catalogs and tests cars, their tunes and the lap times they achieve on specific Forza Horizon 6 tracks. " +
+  "Each track has its own sheet organized as a tier list, so anyone can quickly read the current meta: which cars perform, with which build, and how fast. " +
+  "Use the table at the bottom of this page to jump to any track sheet.";
 
-/** 0-based layout: 4 banner rows, then the header row, then the data rows. */
-const HEADER_ROW_INDEX = 4;
-const DATA_START_ROW_INDEX = 5;
+const VOCAB: { label: string; text: string }[] = [
+  {
+    label: "About Tiers",
+    text: "Tiers separate pace groups within a sheet: the higher the number, the slower the pace the tier covers.",
+  },
+  {
+    label: "About Performance",
+    text:
+      '"B-Speed" is a "Balanced" branch for cars that reach above-average speeds without falling into the "Power" label.\n' +
+      '"B-Accel" is a "Balanced" branch for cars with launch and/or acceleration better than average.\n' +
+      '"B-Handling" is a "Balanced" branch for cars with above-average cornering without falling into the "Handling" label.',
+  },
+  {
+    label: "About Build Type",
+    text:
+      '"Sweaty": engine swap and/or drivetrain swap, with aero.\n' +
+      '"Aero": aero only, no engine swap nor drivetrain swap.\n' +
+      '"Clean": drivetrain swap and changed wheels only.\n' +
+      '"Stock look": looks exactly like stock, wheels included.\n' +
+      '"Purist": no engine swap, drivetrain swap or aero (changed wheels allowed).\n' +
+      '"Mod Purist": a "Purist" branch including non-affecting body parts (non-adjustable aero, bumpers, skirts).\n' +
+      '"Purist + Stock Look": meets both the "Purist" and "Stock Look" categories.',
+  },
+  {
+    label: "Other Info",
+    text: 'Both the "Tuner" and "Alternative Tune(s)" columns carry the tune\'s share code as a cell note — hover over the cell to reveal it.',
+  },
+];
 
-const DASH = "-";
+const DISCLAIMERS: string[] = [
+  "This is a sheet built by and for the community; people submit their times, so some are naturally better optimized than others.",
+  "No single track represents general racing perfectly — some cars will perform better or worse on other tracks.",
+  "If two submissions share the same car with the exact same type of build, only the faster time stays, to avoid absolute duplicates.",
+];
 
-function rgb(r: number, g: number, b: number): sheets_v4.Schema$Color {
-  return { red: r / 255, green: g / 255, blue: b / 255 };
-}
+const SUBMISSIONS: string[] = [
+  "To submit a time, players must provide video evidence of the car completing a clean run on the relevant track.",
+  "The run must be valid and unflagged: any flagged lap, wall contact, wall-tap, or unclear footage results in the time being rejected.",
+  "Times can be submitted through SpreadsheetBot in supported Discord servers, or via accredited staff members. Submissions may be reviewed before being accepted.",
+];
 
-const COLOR = {
-  bannerBg: rgb(11, 59, 57),
-  headerBg: rgb(15, 118, 110),
-  white: rgb(255, 255, 255),
-  subtitleFg: rgb(225, 240, 238),
-  creditFg: rgb(178, 212, 208),
-  rowAltBg: rgb(236, 246, 245),
-  border: rgb(180, 200, 198),
-};
+const CREDITS: string[] = [
+  "Spreadsheet concept by SulexPagMan, maintained by Fenrir & his SpreadsheetBot.",
+  "Questions or submissions? Contact Fenrir on Discord: Tadayoshi123",
+];
+
+const COLUMN_WIDTHS = [230, 210, 120, 120, 150, 150, 340];
+
+type Color = sheets_v4.Schema$Color;
+const WHITE: Color = { red: 1, green: 1, blue: 1 };
+const TITLE_BG: Color = { red: 0.12, green: 0.16, blue: 0.24 };
+const SECTION_BG: Color = { red: 0.26, green: 0.26, blue: 0.26 };
+const LABEL_BG: Color = { red: 0.812, green: 0.886, blue: 0.953 };
+const CREDITS_BG: Color = { red: 0.953, green: 0.929, blue: 0.804 };
 
 function a1EscapeSheetTitle(title: string): string {
   return `'${title.replace(/'/g, "''")}'`;
@@ -65,27 +104,205 @@ function formatDate(iso: string): string {
 
 function lastSubmissionSummary(last: LastSubmission | null): string {
   if (!last) return DASH;
-  const parts = [
+  return [
     last.carClass || DASH,
     last.car || DASH,
     last.time || DASH,
     last.driver || DASH,
     formatDate(last.timestampIso),
-  ];
-  return parts.join(" · ");
+  ].join(" · ");
 }
 
-type PortalRow = {
-  label: string;
-  url: string;
-  cells: string[];
-};
+/**
+ * Accumulates sheet content (values) and the formatting/merge/link requests
+ * needed to render the single-page hub. Row indices are tracked as rows are
+ * appended so formatting can target them precisely.
+ */
+class HubBuilder {
+  readonly values: string[][] = [];
+  readonly merges: sheets_v4.Schema$Request[] = [];
+  readonly formats: sheets_v4.Schema$Request[] = [];
+  readonly links: sheets_v4.Schema$Request[] = [];
+
+  constructor(private readonly sheetId: number) {}
+
+  private push(cells: string[]): number {
+    const padded = [...cells];
+    while (padded.length < COL_COUNT) padded.push("");
+    const idx = this.values.length;
+    this.values.push(padded);
+    return idx;
+  }
+
+  private merge(rowIdx: number, startCol = 0, endCol = COL_COUNT): void {
+    this.merges.push({
+      mergeCells: {
+        range: this.range(rowIdx, rowIdx + 1, startCol, endCol),
+        mergeType: "MERGE_ALL",
+      },
+    });
+  }
+
+  private format(
+    rowIdx: number,
+    startCol: number,
+    endCol: number,
+    fmt: sheets_v4.Schema$CellFormat
+  ): void {
+    this.formats.push({
+      repeatCell: {
+        range: this.range(rowIdx, rowIdx + 1, startCol, endCol),
+        cell: { userEnteredFormat: fmt },
+        fields: "userEnteredFormat",
+      },
+    });
+  }
+
+  private range(
+    startRow: number,
+    endRow: number,
+    startCol: number,
+    endCol: number
+  ): sheets_v4.Schema$GridRange {
+    return {
+      sheetId: this.sheetId,
+      startRowIndex: startRow,
+      endRowIndex: endRow,
+      startColumnIndex: startCol,
+      endColumnIndex: endCol,
+    };
+  }
+
+  spacer(): void {
+    this.push([""]);
+  }
+
+  banner(): void {
+    const titleRow = this.push([TITLE]);
+    this.merge(titleRow);
+    this.format(titleRow, 0, COL_COUNT, {
+      backgroundColor: TITLE_BG,
+      horizontalAlignment: "CENTER",
+      verticalAlignment: "MIDDLE",
+      textFormat: { foregroundColor: WHITE, bold: true, fontSize: 16 },
+    });
+
+    const tagRow = this.push([TAGLINE]);
+    this.merge(tagRow);
+    this.format(tagRow, 0, COL_COUNT, {
+      horizontalAlignment: "CENTER",
+      wrapStrategy: "WRAP",
+      textFormat: { italic: true },
+    });
+  }
+
+  section(title: string): void {
+    const idx = this.push([title]);
+    this.merge(idx);
+    this.format(idx, 0, COL_COUNT, {
+      backgroundColor: SECTION_BG,
+      verticalAlignment: "MIDDLE",
+      textFormat: { foregroundColor: WHITE, bold: true, fontSize: 11 },
+    });
+  }
+
+  paragraph(text: string): void {
+    const idx = this.push([text]);
+    this.merge(idx);
+    this.format(idx, 0, COL_COUNT, {
+      verticalAlignment: "TOP",
+      wrapStrategy: "WRAP",
+    });
+  }
+
+  /** Label cell (column A) + wrapped text spanning the rest of the row. */
+  labelled(label: string, text: string): void {
+    const idx = this.push([label, text]);
+    this.merge(idx, 1, COL_COUNT);
+    this.format(idx, 0, 1, {
+      backgroundColor: LABEL_BG,
+      verticalAlignment: "TOP",
+      wrapStrategy: "WRAP",
+      textFormat: { bold: true },
+    });
+    this.format(idx, 1, COL_COUNT, {
+      verticalAlignment: "TOP",
+      wrapStrategy: "WRAP",
+    });
+  }
+
+  bullet(text: string): void {
+    this.paragraph(`•  ${text}`);
+  }
+
+  credit(text: string): void {
+    const idx = this.push([text]);
+    this.merge(idx);
+    this.format(idx, 0, COL_COUNT, {
+      backgroundColor: CREDITS_BG,
+      verticalAlignment: "MIDDLE",
+      wrapStrategy: "WRAP",
+      textFormat: { bold: true },
+    });
+  }
+
+  tableHeader(): void {
+    const idx = this.push([...TABLE_HEADERS]);
+    this.format(idx, 0, COL_COUNT, {
+      backgroundColor: SECTION_BG,
+      verticalAlignment: "MIDDLE",
+      wrapStrategy: "WRAP",
+      textFormat: { foregroundColor: WHITE, bold: true },
+    });
+  }
+
+  trackRow(label: string, url: string, cells: string[]): void {
+    const idx = this.push(cells);
+    this.format(idx, 0, COL_COUNT, {
+      verticalAlignment: "TOP",
+      wrapStrategy: "WRAP",
+    });
+    this.links.push({
+      updateCells: {
+        range: this.range(idx, idx + 1, 1, 2),
+        rows: [
+          {
+            values: [
+              {
+                userEnteredValue: { stringValue: label },
+                textFormatRuns: [
+                  { startIndex: 0, format: { link: { uri: url } } },
+                ],
+              },
+            ],
+          },
+        ],
+        fields: "userEnteredValue,textFormatRuns",
+      },
+    });
+  }
+
+  columnWidthRequests(): sheets_v4.Schema$Request[] {
+    return COLUMN_WIDTHS.map((width, i) => ({
+      updateDimensionProperties: {
+        range: {
+          sheetId: this.sheetId,
+          dimension: "COLUMNS",
+          startIndex: i,
+          endIndex: i + 1,
+        },
+        properties: { pixelSize: width },
+        fields: "pixelSize",
+      },
+    }));
+  }
+}
 
 /**
- * Regenerate the portal spreadsheet's tab: a styled landing page (title,
- * subtitle, credits) plus one row per configured track with its metadata and
- * latest submission. No-op when the portal is not configured. Idempotent:
- * re-running overwrites values and formatting in place.
+ * Regenerate the portal spreadsheet's single hub page: a styled welcome +
+ * concept presentation (reusing the per-track summary content) followed by a
+ * table of every configured track with its metadata and latest submission.
+ * No-op when the portal is not configured.
  */
 export async function buildAndWritePortal(
   jwt: JWT,
@@ -96,10 +313,36 @@ export async function buildAndWritePortal(
 
   const sheets = google.sheets({ version: "v4", auth: jwt });
   const { spreadsheetId, tabTitle } = cfg.portal;
+  const escaped = a1EscapeSheetTitle(tabTitle);
 
   const sheetId = await ensurePortalTab(sheets, spreadsheetId, tabTitle);
+  const b = new HubBuilder(sheetId);
 
-  const rows: PortalRow[] = [];
+  b.banner();
+  b.spacer();
+
+  b.section("Welcome");
+  b.paragraph(WELCOME);
+  b.spacer();
+
+  b.section("Sheet Vocabulary & Relevant Info");
+  for (const v of VOCAB) b.labelled(v.label, v.text);
+  b.spacer();
+
+  b.section("Disclaimers");
+  for (const d of DISCLAIMERS) b.bullet(d);
+  b.spacer();
+
+  b.section("How Submissions Work");
+  for (const s of SUBMISSIONS) b.bullet(s);
+  b.spacer();
+
+  b.section("Credits & Contact");
+  for (const c of CREDITS) b.credit(c);
+  b.spacer();
+
+  b.section("Tracks");
+  b.tableHeader();
   for (const track of cfg.tracks.values()) {
     let last: LastSubmission | null = null;
     try {
@@ -107,33 +350,42 @@ export async function buildAndWritePortal(
     } catch {
       last = null;
     }
-    rows.push({
-      label: track.label,
-      url: spreadsheetUrl(track.spreadsheetId),
-      cells: [
-        track.label,
-        track.label,
-        track.surface ?? DASH,
-        track.trackType ?? DASH,
-        track.recommended ?? DASH,
-        last ? formatDate(last.timestampIso) : DASH,
-        lastSubmissionSummary(last),
-      ],
-    });
+    b.trackRow(track.label, spreadsheetUrl(track.spreadsheetId), [
+      track.label,
+      track.label,
+      track.surface ?? DASH,
+      track.trackType ?? DASH,
+      track.recommended ?? DASH,
+      last ? formatDate(last.timestampIso) : DASH,
+      lastSubmissionSummary(last),
+    ]);
   }
 
-  const escaped = a1EscapeSheetTitle(tabTitle);
-  const blank = Array.from({ length: COLUMN_COUNT }, () => "");
-  const bannerRow = (text: string) => [text, ...blank.slice(1)];
-
-  const values: string[][] = [
-    bannerRow(PORTAL_TITLE),
-    bannerRow(PORTAL_SUBTITLE),
-    bannerRow(PORTAL_CREDITS),
-    [...blank],
-    [...PORTAL_HEADERS],
-    ...rows.map((r) => r.cells),
-  ];
+  // Best-effort reset of previous merges/formats so a shrinking layout leaves
+  // no stragglers. Ignored on first run when nothing exists yet.
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            unmergeCells: {
+              range: { sheetId, startRowIndex: 0, endRowIndex: 1000, startColumnIndex: 0, endColumnIndex: 26 },
+            },
+          },
+          {
+            repeatCell: {
+              range: { sheetId, startRowIndex: 0, endRowIndex: 1000, startColumnIndex: 0, endColumnIndex: 26 },
+              cell: { userEnteredFormat: {} },
+              fields: "userEnteredFormat",
+            },
+          },
+        ],
+      },
+    });
+  } catch {
+    // no-op
+  }
 
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
@@ -144,278 +396,20 @@ export async function buildAndWritePortal(
     spreadsheetId,
     range: `${escaped}!A1`,
     valueInputOption: "RAW",
-    requestBody: { values },
+    requestBody: { values: b.values },
   });
 
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: {
-      requests: buildFormattingRequests(sheetId, rows),
+      requests: [
+        ...b.columnWidthRequests(),
+        ...b.merges,
+        ...b.formats,
+        ...b.links,
+      ],
     },
   });
-}
-
-function buildFormattingRequests(
-  sheetId: number,
-  rows: PortalRow[]
-): sheets_v4.Schema$Request[] {
-  const lastRowExclusive = DATA_START_ROW_INDEX + rows.length;
-  const requests: sheets_v4.Schema$Request[] = [];
-
-  requests.push({
-    updateSheetProperties: {
-      properties: {
-        sheetId,
-        gridProperties: { frozenRowCount: HEADER_ROW_INDEX + 1 },
-      },
-      fields: "gridProperties.frozenRowCount",
-    },
-  });
-
-  // Reset any previous merges in the banner area, then re-merge each banner row.
-  requests.push({
-    unmergeCells: {
-      range: {
-        sheetId,
-        startRowIndex: 0,
-        endRowIndex: HEADER_ROW_INDEX,
-        startColumnIndex: 0,
-        endColumnIndex: COLUMN_COUNT,
-      },
-    },
-  });
-  for (let r = 0; r < HEADER_ROW_INDEX; r++) {
-    requests.push({
-      mergeCells: {
-        mergeType: "MERGE_ALL",
-        range: {
-          sheetId,
-          startRowIndex: r,
-          endRowIndex: r + 1,
-          startColumnIndex: 0,
-          endColumnIndex: COLUMN_COUNT,
-        },
-      },
-    });
-  }
-
-  requests.push(
-    bannerFormat(sheetId, 0, {
-      backgroundColor: COLOR.bannerBg,
-      textFormat: {
-        foregroundColor: COLOR.white,
-        bold: true,
-        fontSize: 18,
-      },
-    }),
-    bannerFormat(sheetId, 1, {
-      backgroundColor: COLOR.bannerBg,
-      textFormat: {
-        foregroundColor: COLOR.subtitleFg,
-        italic: true,
-        fontSize: 11,
-      },
-    }),
-    bannerFormat(sheetId, 2, {
-      backgroundColor: COLOR.bannerBg,
-      textFormat: {
-        foregroundColor: COLOR.creditFg,
-        italic: true,
-        fontSize: 9,
-      },
-    }),
-    bannerFormat(sheetId, 3, { backgroundColor: COLOR.bannerBg })
-  );
-
-  requests.push({
-    repeatCell: {
-      range: {
-        sheetId,
-        startRowIndex: HEADER_ROW_INDEX,
-        endRowIndex: HEADER_ROW_INDEX + 1,
-        startColumnIndex: 0,
-        endColumnIndex: COLUMN_COUNT,
-      },
-      cell: {
-        userEnteredFormat: {
-          backgroundColor: COLOR.headerBg,
-          horizontalAlignment: "LEFT",
-          verticalAlignment: "MIDDLE",
-          textFormat: { foregroundColor: COLOR.white, bold: true, fontSize: 10 },
-        },
-      },
-      fields:
-        "userEnteredFormat(backgroundColor,horizontalAlignment,verticalAlignment,textFormat)",
-    },
-  });
-
-  if (rows.length > 0) {
-    requests.push({
-      repeatCell: {
-        range: {
-          sheetId,
-          startRowIndex: DATA_START_ROW_INDEX,
-          endRowIndex: lastRowExclusive,
-          startColumnIndex: 0,
-          endColumnIndex: COLUMN_COUNT,
-        },
-        cell: {
-          userEnteredFormat: {
-            verticalAlignment: "MIDDLE",
-            wrapStrategy: "WRAP",
-            textFormat: { fontSize: 10 },
-          },
-        },
-        fields:
-          "userEnteredFormat(verticalAlignment,wrapStrategy,textFormat)",
-      },
-    });
-
-    for (let i = 0; i < rows.length; i++) {
-      if (i % 2 === 1) {
-        requests.push({
-          repeatCell: {
-            range: {
-              sheetId,
-              startRowIndex: DATA_START_ROW_INDEX + i,
-              endRowIndex: DATA_START_ROW_INDEX + i + 1,
-              startColumnIndex: 0,
-              endColumnIndex: COLUMN_COUNT,
-            },
-            cell: { userEnteredFormat: { backgroundColor: COLOR.rowAltBg } },
-            fields: "userEnteredFormat.backgroundColor",
-          },
-        });
-      }
-    }
-
-    requests.push({
-      repeatCell: {
-        range: {
-          sheetId,
-          startRowIndex: DATA_START_ROW_INDEX,
-          endRowIndex: lastRowExclusive,
-          startColumnIndex: 0,
-          endColumnIndex: 1,
-        },
-        cell: { userEnteredFormat: { textFormat: { bold: true } } },
-        fields: "userEnteredFormat.textFormat.bold",
-      },
-    });
-
-    // Track-name hyperlinks in the Link column via cell metadata (locale-safe;
-    // no HYPERLINK formula so it works on French-locale spreadsheets).
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i]!;
-      requests.push({
-        updateCells: {
-          range: {
-            sheetId,
-            startRowIndex: DATA_START_ROW_INDEX + i,
-            endRowIndex: DATA_START_ROW_INDEX + i + 1,
-            startColumnIndex: 1,
-            endColumnIndex: 2,
-          },
-          rows: [
-            {
-              values: [
-                {
-                  userEnteredValue: { stringValue: row.label },
-                  textFormatRuns: [
-                    { startIndex: 0, format: { link: { uri: row.url } } },
-                  ],
-                },
-              ],
-            },
-          ],
-          fields: "userEnteredValue,textFormatRuns",
-        },
-      });
-    }
-
-    const solid = {
-      style: "SOLID" as const,
-      color: COLOR.border,
-    };
-    requests.push({
-      updateBorders: {
-        range: {
-          sheetId,
-          startRowIndex: HEADER_ROW_INDEX,
-          endRowIndex: lastRowExclusive,
-          startColumnIndex: 0,
-          endColumnIndex: COLUMN_COUNT,
-        },
-        top: solid,
-        bottom: solid,
-        left: solid,
-        right: solid,
-        innerHorizontal: solid,
-        innerVertical: solid,
-      },
-    });
-  }
-
-  const widths: Record<number, number> = {
-    0: 240,
-    1: 220,
-    2: 120,
-    3: 110,
-    4: 180,
-    5: 150,
-    6: 380,
-  };
-  for (const [col, px] of Object.entries(widths)) {
-    requests.push({
-      updateDimensionProperties: {
-        range: {
-          sheetId,
-          dimension: "COLUMNS",
-          startIndex: Number(col),
-          endIndex: Number(col) + 1,
-        },
-        properties: { pixelSize: px },
-        fields: "pixelSize",
-      },
-    });
-  }
-
-  requests.push({
-    updateDimensionProperties: {
-      range: { sheetId, dimension: "ROWS", startIndex: 0, endIndex: 1 },
-      properties: { pixelSize: 44 },
-      fields: "pixelSize",
-    },
-  });
-
-  return requests;
-}
-
-function bannerFormat(
-  sheetId: number,
-  rowIndex: number,
-  format: sheets_v4.Schema$CellFormat
-): sheets_v4.Schema$Request {
-  return {
-    repeatCell: {
-      range: {
-        sheetId,
-        startRowIndex: rowIndex,
-        endRowIndex: rowIndex + 1,
-        startColumnIndex: 0,
-        endColumnIndex: COLUMN_COUNT,
-      },
-      cell: {
-        userEnteredFormat: {
-          horizontalAlignment: "CENTER",
-          verticalAlignment: "MIDDLE",
-          ...format,
-        },
-      },
-      fields:
-        "userEnteredFormat(backgroundColor,horizontalAlignment,verticalAlignment,textFormat)",
-    },
-  };
 }
 
 async function ensurePortalTab(
