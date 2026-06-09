@@ -48,6 +48,23 @@ Moderators add Forza Horizon–style tier-list rows via Discord slash commands (
 6. `npm run build && npm run register` (with `DISCORD_GUILD_ID` including their server).
 7. Redeploy the bot (config files must ship with the app on Discloud).
 
+### Portal spreadsheet (overview of all tracks)
+
+An optional, **auto-regenerated** spreadsheet that lists every configured track with its metadata and latest submission — a navigation hub instead of a bare list of links.
+
+1. Create an **empty** Google spreadsheet.
+2. **Share** it as **Editor** with the same service account email used for the tracks.
+3. Point the bot at it, either:
+   - top-level `portal` block in `config/tracks.json` (`{ "spreadsheetId": "…", "tabTitle": "Tracks" }`), or
+   - env var `PORTAL_SPREADSHEET_ID` (overrides `tracks.json`; `PORTAL_TAB_TITLE` overrides the tab name).
+4. Fill the per-track metadata in `config/tracks.json` (`surface`, `trackType`, `recommended` — all optional; missing values show `-`).
+
+The `Tracks` tab is rebuilt on **startup** and after every successful **add/update**. Columns: `Tracé | Lien | Surface | Type | Voiture/Perf recommandée | Dernière MAJ | Dernière soumission (classe, voiture, temps, conducteur, date)`. The "last submission" data comes from each track's `_SubmissionLog` (below). If the portal is not configured, the feature is silently disabled (no regression). Portal write failures are logged but never affect command replies.
+
+### Submission journal (`_SubmissionLog`)
+
+Every successful `/add-entry` and `/edit-entry` is appended (append-only, never sorted) to a `_SubmissionLog` tab **inside that track's spreadsheet**. The tab (with a header row) is **created automatically** on first use — the service account already has Editor rights. Columns: `Timestamp ISO | Action | Outcome | Discord User ID | Username | Guild ID | Channel ID | Track ID | Class | Car | Time | Driver | Message Link`. `Outcome` is one of `added`, `updated`, `rejected-not-faster`. Logging is best-effort: a failure is logged to the console but never breaks the user's command.
+
 ### Time format
 
 Lap times use **`M:SS.mmm`** (e.g. `0:43.600`, `1:02.245`). Comma or dot is accepted for the fractional part (`0:43,600`). **Smaller = faster.** Values are normalized to this format in column **C**. Legacy rows without a colon (e.g. `43.6`) are still read as **seconds only**. Tier labels in column A should use the same syntax in thresholds (e.g. `T1 (<0:45.000)`).

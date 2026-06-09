@@ -1,7 +1,13 @@
 import { google } from "googleapis";
 import type { sheets_v4 } from "googleapis";
 import type { JWT } from "google-auth-library";
-import type { SheetConfig } from "./types.js";
+import type { SheetConfig, SubmissionResult } from "./types.js";
+import {
+  SUBMISSION_LOG_TAB,
+  SUBMISSION_LOG_HEADERS,
+  buildSubmissionLogRow,
+  type SubmissionLogEntry,
+} from "./submission-log.js";
 import {
   parseLapTime,
   formatTimeForSheet,
@@ -694,7 +700,7 @@ export class SheetsEntryService {
   /**
    * Merge optional fields into an existing row. If `time` changes, row is deleted/reinserted sorted.
    */
-  async editEntry(p: EditEntryPayload): Promise<string> {
+  async editEntry(p: EditEntryPayload): Promise<SubmissionResult> {
     if (editPayloadPatchCount(p) === 0) {
       throw new Error(
         "Provide at least one field to change (e.g. `time`, `tuner`, `video`, …)."
@@ -884,21 +890,23 @@ export class SheetsEntryService {
       alternateNoteWrite,
     });
 
-    if (reorderNeeded) {
-      return (
-        `Updated **${rowStrings[0]}** (${rowStrings[1]}) — ` +
+    const message = reorderNeeded
+      ? `Updated **${rowStrings[0]}** (${rowStrings[1]}) — ` +
         `re-sorted into **${tabTitle}** at row **${targetPhysical}**.`
-      );
-    }
-    return (
-      `Updated **${tabTitle}** row **${targetPhysical}** — **${rowStrings[0]}**.`
-    );
+      : `Updated **${tabTitle}** row **${targetPhysical}** — **${rowStrings[0]}**.`;
+
+    return {
+      message,
+      outcome: "updated",
+      tabTitle,
+      physicalRow: targetPhysical,
+    };
   }
 
   /**
    * Insert sorted row into B:O + notes D/O; column A tier merge is expanded/rebuilt.
    */
-  async addOrUpdateRow(p: NewEntryPayload): Promise<string> {
+  async addOrUpdateRow(p: NewEntryPayload): Promise<SubmissionResult> {
     const tabTitle = this.tabForClass(p.car_class);
     const dataStartRow = this.dataStartRowForTab(tabTitle);
 
@@ -910,16 +918,21 @@ export class SheetsEntryService {
 
     let rows = await this.readDataRows(tabTitle, dataStartRow);
     const dupIdx = rows.findIndex((r) => normalizeCarKey(r.car) === newCarKey);
+    const isUpdate = dupIdx >= 0;
 
     const sheetId = await this.getSheetIdByTitle(tabTitle);
 
     if (dupIdx >= 0) {
       const existing = rows[dupIdx]!;
       if (existing.timeNum <= newTimeNum) {
-        return (
-          `This car is already listed with a faster or equal time ` +
-          `(${formatLapTimeSeconds(existing.timeNum)}). No changes made.`
-        );
+        return {
+          message:
+            `This car is already listed with a faster or equal time ` +
+            `(${formatLapTimeSeconds(existing.timeNum)}). No changes made.`,
+          outcome: "rejected-not-faster",
+          tabTitle,
+          physicalRow: 0,
+        };
       }
       const dupPhysical1Based = dataStartRow + existing.offset;
       const tierBlocksBefore = await this.readTierBlocks(tabTitle);
@@ -1014,9 +1027,124 @@ export class SheetsEntryService {
       alternateNoteWrite: oNote.length > 0 ? oNote : undefined,
     });
 
-    return (
-      `Added **${p.car.trim()}** (${formatTimeForSheet(p.time)}) ` +
-      `to **${tabTitle}** at row ${insertPhysical1Based}.`
+    return {
+      message:
+        `Added **${p.car.trim()}** (${formatTimeForSheet(p.time)}) ` +
+        `to **${tabTitle}** at row ${insertPhysical1Based}.`,
+      outcome: isUpdate ? "updated" : "added",
+      tabTitle,
+      physicalRow: insertPhysical1Based,
+    };
+  }
+
+  /**
+   * Ensure the append-only `_SubmissionLog` tab exists (creating it with a header
+   * row if missing). Idempotent; safe to call before each append.
+   */
+  private async ensureSubmissionLogTab(): Promise<void> {
+    const res = await withBackoff(
+      () =>
+        this.sheets().spreadsheets.get({
+          spreadsheetId: this.spreadsheetId,
+          fields: "sheets.properties.title",
+        }),
+      "spreadsheets.get.logTab"
+    );
+    const exists = res.data.sheets?.some(
+      (s) => s.properties?.title === SUBMISSION_LOG_TAB
+    );
+    if (exists) return;
+
+    await withBackoff(
+      () =>
+        this.sheets().spreadsheets.batchUpdate({
+          spreadsheetId: this.spreadsheetId,
+          requestBody: {
+            requests: [
+              { addSheet: { properties: { title: SUBMISSION_LOG_TAB } } },
+            ],
+          },
+        }),
+      "batchUpdate.addLogTab"
+    );
+
+    await withBackoff(
+      () =>
+        this.sheets().spreadsheets.values.update({
+          spreadsheetId: this.spreadsheetId,
+          range: `${a1EscapeSheetTitle(SUBMISSION_LOG_TAB)}!A1`,
+          valueInputOption: "RAW",
+          requestBody: { values: [[...SUBMISSION_LOG_HEADERS]] },
+        }),
+      "values.update.logHeader"
     );
   }
+
+  /**
+   * Append one row to the `_SubmissionLog` journal. Append-only, never sorts.
+   * Creates the tab on first use.
+   */
+  async appendSubmissionLog(entry: SubmissionLogEntry): Promise<void> {
+    await this.ensureSubmissionLogTab();
+    const row = buildSubmissionLogRow(entry);
+    await withBackoff(
+      () =>
+        this.sheets().spreadsheets.values.append({
+          spreadsheetId: this.spreadsheetId,
+          range: `${a1EscapeSheetTitle(SUBMISSION_LOG_TAB)}!A1`,
+          valueInputOption: "RAW",
+          insertDataOption: "INSERT_ROWS",
+          requestBody: { values: [row] },
+        }),
+      "values.append.log"
+    );
+  }
+
+  /**
+   * Read the most recent journal entry from `_SubmissionLog` (for the portal).
+   * Returns null when the tab is absent or has no data rows.
+   */
+  async readLastSubmission(): Promise<LastSubmission | null> {
+    const range = `${a1EscapeSheetTitle(SUBMISSION_LOG_TAB)}!A2:M`;
+    let res: sheets_v4.Schema$ValueRange;
+    try {
+      const r = await withBackoff(
+        () =>
+          this.sheets().spreadsheets.values.get({
+            spreadsheetId: this.spreadsheetId,
+            range,
+            majorDimension: "ROWS",
+          }),
+        "values.get.lastSubmission"
+      );
+      res = r.data;
+    } catch {
+      return null;
+    }
+    const rows = res.values ?? [];
+    if (rows.length === 0) return null;
+    const last = rows[rows.length - 1] ?? [];
+    const cell = (i: number): string => {
+      const v = last[i];
+      return v == null ? "" : String(v).trim();
+    };
+    return {
+      timestampIso: cell(0),
+      outcome: cell(2),
+      carClass: cell(8),
+      car: cell(9),
+      time: cell(10),
+      driver: cell(11),
+    };
+  }
 }
+
+/** Last journal entry, as consumed by the portal. */
+export type LastSubmission = {
+  timestampIso: string;
+  outcome: string;
+  carClass: string;
+  car: string;
+  time: string;
+  driver: string;
+};

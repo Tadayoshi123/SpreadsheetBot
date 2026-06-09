@@ -4,7 +4,14 @@
       "label": "Main tier list",
       "spreadsheetId": "PASTE_SPREADSHEET_ID_HERE",
       "sheetConfigPath": "./config/sheets.json",
-      "allowedRoleIds": ["PASTE_DISCORD_ROLE_ID_AS_STRING"]
+      "allowedRoleIds": ["PASTE_DISCORD_ROLE_ID_AS_STRING"],
+      "surface": "Asphalt",
+      "trackType": "Circuit",
+      "recommended": "S2 — AWD build"
     }
+  },
+  "portal": {
+    "spreadsheetId": "PASTE_PORTAL_SPREADSHEET_ID_HERE",
+    "tabTitle": "Tracks"
   }
 }

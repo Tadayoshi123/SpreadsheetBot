@@ -5,6 +5,7 @@ import type {
   AppConfig,
   GuildTrackBinding,
   GuildTracksFile,
+  PortalConfig,
   ResolvedTrack,
   SheetConfig,
   SlashSheetCommandContext,
@@ -83,12 +84,34 @@ function resolveTrack(
     sheetConfigPath,
     sheetConfig: loadSheetJson(sheetConfigPath),
     allowedRoleIds: normalizeAllowedRoleIds(raw.allowedRoleIds, id),
+    surface: raw.surface?.trim() || undefined,
+    trackType: raw.trackType?.trim() || undefined,
+    recommended: raw.recommended?.trim() || undefined,
+  };
+}
+
+/**
+ * Resolve the portal config from tracks.json values + PORTAL_SPREADSHEET_ID env
+ * override. Returns undefined (portal disabled) when no spreadsheet id is set.
+ */
+function resolvePortalConfig(
+  fileSpreadsheetId?: string,
+  fileTabTitle?: string
+): PortalConfig | undefined {
+  const spreadsheetId =
+    process.env.PORTAL_SPREADSHEET_ID?.trim() || fileSpreadsheetId?.trim();
+  if (!spreadsheetId) return undefined;
+  return {
+    spreadsheetId,
+    tabTitle:
+      process.env.PORTAL_TAB_TITLE?.trim() || fileTabTitle?.trim() || "Tracks",
   };
 }
 
 function loadTracksMap(cwd: string): {
   tracks: Map<string, ResolvedTrack>;
   legacySingleTrack: boolean;
+  portal?: PortalConfig;
 } {
   const tracksPath = resolveConfigPath(
     "TRACKS_CONFIG_PATH",
@@ -108,7 +131,11 @@ function loadTracksMap(cwd: string): {
       }
       tracks.set(id, resolveTrack(id, raw, cwd));
     }
-    return { tracks, legacySingleTrack: false };
+    return {
+      tracks,
+      legacySingleTrack: false,
+      portal: resolvePortalConfig(file.portal?.spreadsheetId, file.portal?.tabTitle),
+    };
   }
 
   const spreadsheetId = process.env.SPREADSHEET_ID?.trim();
@@ -132,7 +159,11 @@ function loadTracksMap(cwd: string): {
     sheetConfig: loadSheetJson(sheetConfigPath),
     allowedRoleIds: [],
   };
-  return { tracks: new Map([["default", track]]), legacySingleTrack: true };
+  return {
+    tracks: new Map([["default", track]]),
+    legacySingleTrack: true,
+    portal: resolvePortalConfig(),
+  };
 }
 
 function loadGuildTracks(cwd: string): Record<string, GuildTrackBinding> {
@@ -175,7 +206,7 @@ export function loadAppConfig(): AppConfig {
   if (!token) throw new Error("DISCORD_TOKEN is required");
 
   const cwd = process.cwd();
-  const { tracks, legacySingleTrack } = loadTracksMap(cwd);
+  const { tracks, legacySingleTrack, portal } = loadTracksMap(cwd);
   const guildTracks = loadGuildTracks(cwd);
   validateGuildTracks(guildTracks, tracks);
 
@@ -188,6 +219,7 @@ export function loadAppConfig(): AppConfig {
     tracks,
     guildTracks,
     legacySingleTrack,
+    portal,
   };
 }
 

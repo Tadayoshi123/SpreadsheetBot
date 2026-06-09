@@ -11,6 +11,14 @@ import { createSheetsJwt } from "./auth-google.js";
 import type { EditEntryPayload, NewEntryPayload } from "./sheets.js";
 import { memberAllowedTrackIds } from "./permissions.js";
 import { SheetsServiceRegistry } from "./service-registry.js";
+import { buildAndWritePortal } from "./portal.js";
+import type {
+  ResolvedTrack,
+  SubmissionAction,
+  SubmissionContext,
+  SubmissionResult,
+} from "./types.js";
+import type { ChatInputCommandInteraction } from "discord.js";
 import { engineAutocompleteChoices } from "./engine-autocomplete.js";
 import { trackAutocompleteChoices } from "./track-autocomplete.js";
 import { trackIdsForGuild } from "./config.js";
@@ -46,6 +54,68 @@ if (cfg.allowedRoleIds.length === 0) {
 const jwt = createSheetsJwt();
 const registry = new SheetsServiceRegistry(jwt);
 
+/** Regenerate the portal (fire-and-forget; never throws). */
+function regeneratePortal(reason: string): void {
+  if (!cfg.portal) return;
+  buildAndWritePortal(jwt, cfg, registry).catch((err) => {
+    console.error(`Portal regeneration failed (${reason}):`, err);
+  });
+}
+
+/**
+ * Append the submission to the track's `_SubmissionLog` and refresh the portal.
+ * Best-effort: failures are logged but never surfaced to the user.
+ */
+async function recordSubmission(params: {
+  interaction: ChatInputCommandInteraction;
+  track: ResolvedTrack;
+  action: SubmissionAction;
+  result: SubmissionResult;
+  carClass: string;
+  car: string;
+  time: string;
+  driver: string;
+}): Promise<void> {
+  const { interaction, track, action, result } = params;
+  try {
+    let messageUrl: string | undefined;
+    try {
+      const reply = await interaction.fetchReply();
+      if (interaction.guildId && interaction.channelId && reply.id) {
+        messageUrl = `https://discord.com/channels/${interaction.guildId}/${interaction.channelId}/${reply.id}`;
+      }
+    } catch {
+      messageUrl = undefined;
+    }
+
+    const context: SubmissionContext = {
+      userId: interaction.user.id,
+      username: interaction.user.username,
+      guildId: interaction.guildId ?? "",
+      channelId: interaction.channelId ?? "",
+      messageUrl,
+    };
+
+    await registry.getForTrack(track).appendSubmissionLog({
+      timestampIso: new Date().toISOString(),
+      action,
+      outcome: result.outcome,
+      trackId: track.id,
+      carClass: params.carClass,
+      car: params.car,
+      time: params.time,
+      driver: params.driver,
+      context,
+    });
+  } catch (err) {
+    console.error("Submission log append failed:", err);
+  }
+
+  if (result.outcome === "added" || result.outcome === "updated") {
+    regeneratePortal(`after ${action}`);
+  }
+}
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
@@ -62,6 +132,11 @@ client.once(Events.ClientReady, (c) => {
     status: "online",
     activities: [{ name: presenceName, type: ActivityType.Playing }],
   });
+
+  if (cfg.portal) {
+    console.log(`Portal enabled (spreadsheet ${cfg.portal.spreadsheetId}).`);
+    regeneratePortal("startup");
+  }
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -255,7 +330,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const summary = await sheets.editEntry(edit);
       await interaction.editReply({
-        content: `**Track:** ${track.label}\n${summary}`,
+        content: `**Track:** ${track.label}\n${summary.message}`,
+      });
+      await recordSubmission({
+        interaction,
+        track,
+        action: "edit",
+        result: summary,
+        carClass: edit.car_class,
+        car: edit.car,
+        time: edit.time ?? "",
+        driver: edit.driver ?? "",
       });
       return;
     }
@@ -283,7 +368,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const summary = await sheets.addOrUpdateRow(payload);
     await interaction.editReply({
-      content: `**Track:** ${track.label}\n${summary}`,
+      content: `**Track:** ${track.label}\n${summary.message}`,
+    });
+    await recordSubmission({
+      interaction,
+      track,
+      action: "add",
+      result: summary,
+      carClass: payload.car_class,
+      car: payload.car,
+      time: payload.time,
+      driver: payload.driver,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
