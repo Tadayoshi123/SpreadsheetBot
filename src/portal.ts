@@ -22,10 +22,15 @@ const TITLE = "FH6 Community Tune Lab by Fenrir";
 const TAGLINE =
   "Community-driven Forza Horizon 6 tier lists — cars, tunes and lap times, track by track.";
 
-const WELCOME =
-  "FH6 Community Tune Lab catalogs and tests cars, their tunes and the lap times they achieve on specific Forza Horizon 6 tracks. " +
-  "Each track has its own sheet organized as a tier list, so anyone can quickly read the current meta: which cars perform, with which build, and how fast. " +
-  "Use the table at the bottom of this page to jump to any track sheet.";
+const WELCOME_PARAGRAPHS: string[] = [
+  "Welcome to the FH6 Community Tune Lab — your central hub for every track sheet maintained by the community. " +
+    "Each track has its own dedicated spreadsheet, organized as a tier list, where cars are catalogued and tested with their tunes and the lap times they achieve. " +
+    "Together they paint a picture of the current meta on every track: which cars perform, with which build, and how fast.",
+  "Anyone can contribute! Times are submitted through SpreadsheetBot on supported Discord servers (or via accredited staff members), with video evidence of a clean run. " +
+    "Every accepted submission instantly updates the relevant track sheet — and this hub. " +
+    "Full submission rules and details live in the Summary tab of each track sheet.",
+  "Use the Tracks table below to jump to any track sheet, and check the vocabulary section further down if a term used in the sheets is unclear.",
+];
 
 const VOCAB: { label: string; text: string }[] = [
   {
@@ -56,20 +61,8 @@ const VOCAB: { label: string; text: string }[] = [
   },
 ];
 
-const DISCLAIMERS: string[] = [
-  "This is a sheet built by and for the community; people submit their times, so some are naturally better optimized than others.",
-  "No single track represents general racing perfectly — some cars will perform better or worse on other tracks.",
-  "If two submissions share the same car with the exact same type of build, only the faster time stays, to avoid absolute duplicates.",
-];
-
-const SUBMISSIONS: string[] = [
-  "To submit a time, players must provide video evidence of the car completing a clean run on the relevant track.",
-  "The run must be valid and unflagged: any flagged lap, wall contact, wall-tap, or unclear footage results in the time being rejected.",
-  "Times can be submitted through SpreadsheetBot in supported Discord servers, or via accredited staff members. Submissions may be reviewed before being accepted.",
-];
-
 const CREDITS: string[] = [
-  "Spreadsheet concept by SulexPagMan, maintained by Fenrir & his SpreadsheetBot.",
+  "Hub created and maintained by Fenrir & his SpreadsheetBot.",
   "Questions or submissions? Contact Fenrir on Discord: Tadayoshi123",
 ];
 
@@ -231,10 +224,6 @@ class HubBuilder {
     });
   }
 
-  bullet(text: string): void {
-    this.paragraph(`•  ${text}`);
-  }
-
   credit(text: string): void {
     const idx = this.push([text]);
     this.merge(idx);
@@ -250,6 +239,7 @@ class HubBuilder {
     const idx = this.push([...TABLE_HEADERS]);
     this.format(idx, 0, COL_COUNT, {
       backgroundColor: SECTION_BG,
+      horizontalAlignment: "CENTER",
       verticalAlignment: "MIDDLE",
       wrapStrategy: "WRAP",
       textFormat: { foregroundColor: WHITE, bold: true },
@@ -322,23 +312,7 @@ export async function buildAndWritePortal(
   b.spacer();
 
   b.section("Welcome");
-  b.paragraph(WELCOME);
-  b.spacer();
-
-  b.section("Sheet Vocabulary & Relevant Info");
-  for (const v of VOCAB) b.labelled(v.label, v.text);
-  b.spacer();
-
-  b.section("Disclaimers");
-  for (const d of DISCLAIMERS) b.bullet(d);
-  b.spacer();
-
-  b.section("How Submissions Work");
-  for (const s of SUBMISSIONS) b.bullet(s);
-  b.spacer();
-
-  b.section("Credits & Contact");
-  for (const c of CREDITS) b.credit(c);
+  for (const p of WELCOME_PARAGRAPHS) b.paragraph(p);
   b.spacer();
 
   b.section("Tracks");
@@ -360,6 +334,14 @@ export async function buildAndWritePortal(
       lastSubmissionSummary(last),
     ]);
   }
+  b.spacer();
+
+  b.section("Sheet Vocabulary & Relevant Info");
+  for (const v of VOCAB) b.labelled(v.label, v.text);
+  b.spacer();
+
+  b.section("Credits & Contact");
+  for (const c of CREDITS) b.credit(c);
 
   // Best-effort reset of previous merges/formats so a shrinking layout leaves
   // no stragglers. Ignored on first run when nothing exists yet.
