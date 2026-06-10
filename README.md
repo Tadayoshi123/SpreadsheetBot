@@ -63,7 +63,7 @@ The portal tab is rebuilt on **startup** and after every successful **add/update
 
 ### Submission journal (`_SubmissionLog`)
 
-Every successful `/add-entry` and `/edit-entry` is appended (append-only, never sorted) to a `_SubmissionLog` tab **inside that track's spreadsheet**. The tab (with a header row) is **created automatically** on first use — the service account already has Editor rights. Columns: `Timestamp ISO | Action | Outcome | Discord User ID | Username | Guild ID | Channel ID | Track ID | Class | Car | Time | Driver | Message Link`. `Outcome` is one of `added`, `updated`, `rejected-not-faster`. Logging is best-effort: a failure is logged to the console but never breaks the user's command.
+Every successful `/add-entry` and `/edit-entry` is appended (append-only, never sorted) to a `_SubmissionLog` tab **inside that track's spreadsheet**. The tab (with a header row) is **created automatically** on first use — the service account already has Editor rights. It is **hidden by default** so public viewers do not see it; editors open it via **View → Hidden sheets → _SubmissionLog**. Columns: `Timestamp ISO | Action | Outcome | Discord User ID | Username | Guild ID | Channel ID | Track ID | Class | Car | Time | Driver | Message Link`. `Outcome` is one of `added`, `updated`, `rejected-not-faster`. Logging is best-effort: a failure is logged to the console but never breaks the user's command.
 
 ### Time format
 

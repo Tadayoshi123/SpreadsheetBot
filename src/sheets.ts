@@ -1039,21 +1039,47 @@ export class SheetsEntryService {
 
   /**
    * Ensure the append-only `_SubmissionLog` tab exists (creating it with a header
-   * row if missing). Idempotent; safe to call before each append.
+   * row if missing). The tab is always hidden so viewers cannot see it; editors
+   * can open it via View → Hidden sheets. Idempotent; safe before each append.
    */
   private async ensureSubmissionLogTab(): Promise<void> {
     const res = await withBackoff(
       () =>
         this.sheets().spreadsheets.get({
           spreadsheetId: this.spreadsheetId,
-          fields: "sheets.properties.title",
+          fields: "sheets.properties(sheetId,title,hidden)",
         }),
       "spreadsheets.get.logTab"
     );
-    const exists = res.data.sheets?.some(
+    const existing = res.data.sheets?.find(
       (s) => s.properties?.title === SUBMISSION_LOG_TAB
     );
-    if (exists) return;
+
+    if (existing?.properties?.sheetId != null) {
+      if (!existing.properties.hidden) {
+        await withBackoff(
+          () =>
+            this.sheets().spreadsheets.batchUpdate({
+              spreadsheetId: this.spreadsheetId,
+              requestBody: {
+                requests: [
+                  {
+                    updateSheetProperties: {
+                      properties: {
+                        sheetId: existing.properties!.sheetId!,
+                        hidden: true,
+                      },
+                      fields: "hidden",
+                    },
+                  },
+                ],
+              },
+            }),
+          "batchUpdate.hideLogTab"
+        );
+      }
+      return;
+    }
 
     await withBackoff(
       () =>
@@ -1061,7 +1087,11 @@ export class SheetsEntryService {
           spreadsheetId: this.spreadsheetId,
           requestBody: {
             requests: [
-              { addSheet: { properties: { title: SUBMISSION_LOG_TAB } } },
+              {
+                addSheet: {
+                  properties: { title: SUBMISSION_LOG_TAB, hidden: true },
+                },
+              },
             ],
           },
         }),
