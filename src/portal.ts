@@ -5,12 +5,11 @@ import type { AppConfig } from "./types.js";
 import type { SheetsServiceRegistry } from "./service-registry.js";
 import type { LastSubmission } from "./sheets.js";
 
-const COL_COUNT = 7;
+const COL_COUNT = 6;
 const DASH = "-";
 
 const TABLE_HEADERS = [
   "Track",
-  "Link",
   "Surface",
   "Type",
   "Meta focus",
@@ -18,16 +17,19 @@ const TABLE_HEADERS = [
   "Last submission (class, car, time, driver, date)",
 ] as const;
 
+/** 0-based index of the Track column (kept left-aligned; carries the link). */
+const TRACK_COL = 0;
+
 const TITLE = "FH6 Community Tune Lab by Fenrir";
 const TAGLINE =
-  "Community-driven Forza Horizon 6 tier lists — cars, tunes and lap times, track by track.";
+  "Community-driven Forza Horizon 6 tier lists - Cars, tunes and lap times, track by track.";
 
 const WELCOME_PARAGRAPHS: string[] = [
-  "Welcome to the FH6 Community Tune Lab — your central hub for every track sheet maintained by the community. " +
+  "Welcome to the FH6 Community Tune Lab - your central hub for every track sheet maintained by the community. " +
     "Each track has its own dedicated spreadsheet, organized as a tier list, where cars are catalogued and tested with their tunes and the lap times they achieve. " +
     "Together they paint a picture of the current meta on every track: which cars perform, with which build, and how fast.",
   "Anyone can contribute! Times are submitted through SpreadsheetBot on supported Discord servers (or via accredited staff members), with video evidence of a clean run. " +
-    "Every accepted submission instantly updates the relevant track sheet — and this hub. " +
+    "Every accepted submission instantly updates the relevant track sheet - and this hub. " +
     "Full submission rules and details live in the Summary tab of each track sheet.",
   "Use the Tracks table below to jump to any track sheet, and check the vocabulary section further down if a term used in the sheets is unclear.",
 ];
@@ -57,22 +59,23 @@ const VOCAB: { label: string; text: string }[] = [
   },
   {
     label: "Other Info",
-    text: 'Both the "Tuner" and "Alternative Tune(s)" columns carry the tune\'s share code as a cell note — hover over the cell to reveal it.',
+    text: 'Both the "Tuner" and "Alternative Tune(s)" columns carry the tune\'s share code as a cell note - hover over the cell to reveal it.',
   },
 ];
 
 const CREDITS: string[] = [
-  "Hub created and maintained by Fenrir & his SpreadsheetBot.",
+  "Hub created and maintained by Fenrir and his SpreadsheetBot.",
   "Questions or submissions? Contact Fenrir on Discord: Tadayoshi123",
 ];
 
-const COLUMN_WIDTHS = [230, 210, 120, 120, 150, 150, 340];
+const COLUMN_WIDTHS = [280, 110, 110, 140, 165, 480];
 
 type Color = sheets_v4.Schema$Color;
 const WHITE: Color = { red: 1, green: 1, blue: 1 };
 const TITLE_BG: Color = { red: 0.12, green: 0.16, blue: 0.24 };
 const SECTION_BG: Color = { red: 0.26, green: 0.26, blue: 0.26 };
-const LABEL_BG: Color = { red: 0.812, green: 0.886, blue: 0.953 };
+// #c9daf8 — matches the per-track Summary vocabulary blue.
+const LABEL_BG: Color = { red: 0.788, green: 0.855, blue: 0.973 };
 const CREDITS_BG: Color = { red: 0.953, green: 0.929, blue: 0.804 };
 
 function a1EscapeSheetTitle(title: string): string {
@@ -203,6 +206,7 @@ class HubBuilder {
     const idx = this.push([text]);
     this.merge(idx);
     this.format(idx, 0, COL_COUNT, {
+      horizontalAlignment: "CENTER",
       verticalAlignment: "TOP",
       wrapStrategy: "WRAP",
     });
@@ -229,6 +233,7 @@ class HubBuilder {
     this.merge(idx);
     this.format(idx, 0, COL_COUNT, {
       backgroundColor: CREDITS_BG,
+      horizontalAlignment: "CENTER",
       verticalAlignment: "MIDDLE",
       wrapStrategy: "WRAP",
       textFormat: { bold: true },
@@ -246,15 +251,22 @@ class HubBuilder {
     });
   }
 
+  /** One track row: column A is the track name (left-aligned, links to its sheet); the rest are centered on a single line. */
   trackRow(label: string, url: string, cells: string[]): void {
     const idx = this.push(cells);
-    this.format(idx, 0, COL_COUNT, {
-      verticalAlignment: "TOP",
-      wrapStrategy: "WRAP",
+    this.format(idx, TRACK_COL, TRACK_COL + 1, {
+      horizontalAlignment: "LEFT",
+      verticalAlignment: "MIDDLE",
+      wrapStrategy: "OVERFLOW_CELL",
+    });
+    this.format(idx, TRACK_COL + 1, COL_COUNT, {
+      horizontalAlignment: "CENTER",
+      verticalAlignment: "MIDDLE",
+      wrapStrategy: "OVERFLOW_CELL",
     });
     this.links.push({
       updateCells: {
-        range: this.range(idx, idx + 1, 1, 2),
+        range: this.range(idx, idx + 1, TRACK_COL, TRACK_COL + 1),
         rows: [
           {
             values: [
@@ -312,7 +324,10 @@ export async function buildAndWritePortal(
   b.spacer();
 
   b.section("Welcome");
-  for (const p of WELCOME_PARAGRAPHS) b.paragraph(p);
+  WELCOME_PARAGRAPHS.forEach((p, i) => {
+    if (i > 0) b.spacer();
+    b.paragraph(p);
+  });
   b.spacer();
 
   b.section("Tracks");
@@ -325,7 +340,6 @@ export async function buildAndWritePortal(
       last = null;
     }
     b.trackRow(track.label, spreadsheetUrl(track.spreadsheetId), [
-      track.label,
       track.label,
       track.surface ?? DASH,
       track.trackType ?? DASH,
@@ -341,7 +355,10 @@ export async function buildAndWritePortal(
   b.spacer();
 
   b.section("Credits & Contact");
-  for (const c of CREDITS) b.credit(c);
+  CREDITS.forEach((c, i) => {
+    if (i > 0) b.spacer();
+    b.credit(c);
+  });
 
   // Best-effort reset of previous merges/formats so a shrinking layout leaves
   // no stragglers. Ignored on first run when nothing exists yet.
