@@ -12,6 +12,7 @@ import type { EditEntryPayload, NewEntryPayload } from "./sheets.js";
 import { memberAllowedTrackIds } from "./permissions.js";
 import { SheetsServiceRegistry } from "./service-registry.js";
 import { buildAndWritePortal } from "./portal.js";
+import { buildAddReplyContent, buildEditReplyContent } from "./discord-reply.js";
 import type {
   ResolvedTrack,
   SubmissionAction,
@@ -330,7 +331,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const summary = await sheets.editEntry(edit);
       await interaction.editReply({
-        content: `**Track:** ${track.label}\n${summary.message}`,
+        content: buildEditReplyContent({
+          trackLabel: track.label,
+          result: summary,
+          edit,
+        }),
       });
       await recordSubmission({
         interaction,
@@ -368,7 +373,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const summary = await sheets.addOrUpdateRow(payload);
     await interaction.editReply({
-      content: `**Track:** ${track.label}\n${summary.message}`,
+      content: buildAddReplyContent({
+        trackLabel: track.label,
+        result: summary,
+        video: payload.video,
+      }),
     });
     await recordSubmission({
       interaction,

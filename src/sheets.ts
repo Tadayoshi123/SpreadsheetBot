@@ -1028,9 +1028,9 @@ export class SheetsEntryService {
     });
 
     return {
-      message:
-        `Added **${p.car.trim()}** (${formatTimeForSheet(p.time)}) ` +
-        `to **${tabTitle}** at row ${insertPhysical1Based}.`,
+      message: isUpdate
+        ? `Replaced **${p.car.trim()}** with a faster time (${formatTimeForSheet(p.time)}) in **${tabTitle}** at row ${insertPhysical1Based}.`
+        : `Added **${p.car.trim()}** (${formatTimeForSheet(p.time)}) to **${tabTitle}** at row ${insertPhysical1Based}.`,
       outcome: isUpdate ? "updated" : "added",
       tabTitle,
       physicalRow: insertPhysical1Based,
