@@ -13,6 +13,7 @@ import { memberAllowedTrackIds } from "./permissions.js";
 import { SheetsServiceRegistry } from "./service-registry.js";
 import { buildAndWritePortal } from "./portal.js";
 import { buildAddReplyContent, buildEditReplyContent } from "./discord-reply.js";
+import { formatDiscordErrorMessage } from "./validation-errors.js";
 import type {
   ResolvedTrack,
   SubmissionAction,
@@ -121,6 +122,28 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
 
+/** Reply or edit with a user-safe error (never throws). */
+async function sendInteractionError(
+  interaction: ChatInputCommandInteraction,
+  err: unknown,
+  deferred: boolean
+): Promise<void> {
+  const content = formatDiscordErrorMessage(err);
+  try {
+    if (deferred) {
+      await interaction.editReply({ content });
+    } else if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+  } catch (replyErr) {
+    console.error("Failed to send error reply to Discord:", replyErr);
+    console.error("Original error:", err);
+  }
+}
+
 client.once(Events.ClientReady, (c) => {
   console.log(`Logged in as ${c.user.tag}`);
   const trackCount = cfg.tracks.size;
@@ -221,11 +244,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
   const ephemeral =
     interaction.commandName === "lookup-car" ||
     interaction.commandName === "help";
-  await interaction.deferReply(
-    ephemeral ? { flags: MessageFlags.Ephemeral } : {}
-  );
 
+  let deferred = false;
   try {
+    await interaction.deferReply(
+      ephemeral ? { flags: MessageFlags.Ephemeral } : {}
+    );
+    deferred = true;
+
     if (!interaction.member) {
       await interaction.editReply({
         content: "Could not resolve your member profile in this server.",
@@ -390,10 +416,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       driver: payload.driver,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    await interaction.editReply({
-      content: `Request failed: ${msg}`,
-    });
+    console.error(`${interaction.commandName} failed:`, err);
+    await sendInteractionError(interaction, err, deferred);
   }
 });
 

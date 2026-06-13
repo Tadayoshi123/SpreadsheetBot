@@ -50,6 +50,10 @@ import {
   formatVideoForSheet,
   preserveVideoForSheet,
 } from "./video-hyperlink.js";
+import {
+  ValidationError,
+  formatInvalidEnumMessage,
+} from "./validation-errors.js";
 
 export type NewEntryPayload = {
   /** R, S2, S1, A, B */
@@ -135,9 +139,7 @@ function validateEnum(
   allowed: readonly string[]
 ): void {
   if (!allowed.includes(value)) {
-    throw new Error(
-      `Invalid ${field}: "${value}". Allowed: ${allowed.join(", ")}`
-    );
+    throw new ValidationError(formatInvalidEnumMessage(field, value, allowed));
   }
 }
 

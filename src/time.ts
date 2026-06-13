@@ -4,6 +4,8 @@
  * Legacy sheet values without a colon (e.g. `43.6`) are treated as seconds only.
  */
 
+import { ValidationError } from "./validation-errors.js";
+
 const COLON_LAP_TIME =
   /^(\d+):(\d{1,2})(?:[.,](\d+))?$/;
 
@@ -20,7 +22,9 @@ function normalizeTimeInput(input: string): string {
 export function parseLapTime(input: string): number {
   const s = normalizeTimeInput(input);
   if (!s) {
-    throw new Error(`Invalid time: "${input}"`);
+    throw new ValidationError(
+      `Invalid **time**: value is empty. Use \`M:SS.mmm\` (e.g. \`0:43.600\`, \`1:02.245\`).`
+    );
   }
 
   const colon = s.match(COLON_LAP_TIME);
@@ -35,19 +39,25 @@ export function parseLapTime(input: string): number {
       !Number.isFinite(secFrac) ||
       secWhole >= 60
     ) {
-      throw new Error(`Invalid time: "${input}"`);
+      throw new ValidationError(
+        `Invalid **time**: \`${input}\`. Seconds must be 0–59 in \`M:SS.mmm\` format.`
+      );
     }
     const seconds = secWhole + secFrac;
     return minutes * 60 + seconds;
   }
 
   if (!DECIMAL_SECONDS_ONLY.test(s)) {
-    throw new Error(`Invalid time: "${input}" (use M:SS.mmm, e.g. 0:43.600)`);
+    throw new ValidationError(
+      `Invalid **time**: \`${input}\`. Use \`M:SS.mmm\` (e.g. \`0:43.600\`).`
+    );
   }
 
   const n = Number.parseFloat(s);
   if (!Number.isFinite(n) || n < 0) {
-    throw new Error(`Invalid time: "${input}"`);
+    throw new ValidationError(
+      `Invalid **time**: \`${input}\`. Use \`M:SS.mmm\` (e.g. \`0:43.600\`).`
+    );
   }
   return n;
 }

@@ -1,11 +1,12 @@
 import type { ParsedAlternate } from "./types.js";
+import { ValidationError } from "./validation-errors.js";
 
 /** Extract 9 digits from "123 456 789" or "123456789" */
 export function normalizeShareCode(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (digits.length !== 9) {
-    throw new Error(
-      `Share code must be 9 digits (got ${digits.length}): "${raw}"`
+    throw new ValidationError(
+      `Invalid **tuner share code**: must be exactly **9 digits** (got ${digits.length}). Example: \`123 456 789\` or \`123456789\`.`
     );
   }
   return digits;
@@ -48,14 +49,17 @@ export function parseAlternatesBlock(block: string): ParsedAlternate[] {
   for (const segment of segments) {
     const pipe = segment.indexOf("|");
     if (pipe < 0) {
-      throw new Error(
-        `Invalid alternate entry (use Name|code, separate entries with commas): "${segment}"`
+      throw new ValidationError(
+        `Invalid **alternate tune** entry: use \`Name|123456789\` and separate entries with commas. Got: \`${segment}\``
       );
     }
     const name = segment.slice(0, pipe).trim();
     const codePart = segment.slice(pipe + 1).trim();
-    if (!name)
-      throw new Error(`Missing tuner name in alternate entry: "${segment}"`);
+    if (!name) {
+      throw new ValidationError(
+        `Invalid **alternate tune** entry: missing tuner name before \`|\`. Got: \`${segment}\``
+      );
+    }
     const codeDigits = normalizeShareCode(codePart);
     out.push({ name, codeDigits });
   }
